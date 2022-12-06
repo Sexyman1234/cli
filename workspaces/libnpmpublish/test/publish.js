@@ -3,9 +3,7 @@
 const cloneDeep = require('lodash.clonedeep')
 const crypto = require('crypto')
 const fs = require('fs')
-const path = require('path')
 const npa = require('npm-package-arg')
-const pack = require('libnpmpack')
 const ssri = require('ssri')
 const t = require('tap')
 
@@ -13,6 +11,10 @@ const MockRegistry = require('@npmcli/mock-registry')
 const mockGlobals = require('../../../test/fixtures/mock-globals.js')
 
 // TODO use registry.manifest (requires json date wrangling for nock)
+
+const tarData = fs.readFileSync('./test/fixtures/npmcli-libnpmpublish-test-1.0.0.tgz')
+const shasum = crypto.createHash('sha1').update(tarData).digest('hex')
+const integrity = ssri.fromData(tarData, { algorithms: ['sha512'] })
 
 const token = 'test-auth-token'
 const opts = {
@@ -34,16 +36,7 @@ t.test('basic publish - no npmVersion', async t => {
     description: 'test libnpmpublish package',
   }
   const spec = npa(manifest.name)
-  const testDir = t.testdir({
-    'package.json': JSON.stringify(manifest, null, 2),
-    'index.js': 'hello',
-  })
 
-  // mock registry isn't built to return the tarball in memory for passing back
-  // into libnpmpublish, that's a future fix
-  const tarData = await pack(`file:${testDir}`, { ...opts })
-  const integrity = ssri.fromData(tarData, { algorithms: ['sha512', 'sha1'] })
-  const shasum = integrity.sha1[0].hexDigest()
   const packument = {
     _id: manifest.name,
     name: manifest.name,
@@ -94,16 +87,7 @@ t.test('scoped publish', async t => {
     description: 'test libnpmpublish package',
   }
   const spec = npa(manifest.name)
-  const testDir = t.testdir({
-    'package.json': JSON.stringify(manifest, null, 2),
-    'index.js': 'hello',
-  })
 
-  // mock registry isn't built to return the tarball in memory for passing back
-  // into libnpmpublish, that's a future fix
-  const tarData = await pack(`file:${testDir}`, { ...opts })
-  const integrity = ssri.fromData(tarData, { algorithms: ['sha512', 'sha1'] })
-  const shasum = integrity.sha1[0].hexDigest()
   const packument = {
     _id: manifest.name,
     name: manifest.name,
@@ -154,14 +138,6 @@ t.test('scoped publish - restricted access', async t => {
     description: 'test libnpmpublish package',
   }
   const spec = npa(manifest.name)
-  const testDir = t.testdir({
-    'package.json': JSON.stringify(manifest, null, 2),
-    'index.js': 'hello',
-  })
-
-  const tarData = await pack(`file:${testDir}`, { ...opts })
-  const integrity = ssri.fromData(tarData, { algorithms: ['sha512', 'sha1'] })
-  const shasum = integrity.sha1[0].hexDigest()
 
   const packument = {
     _id: manifest.name,
@@ -217,14 +193,6 @@ t.test('retry after a conflict', async t => {
     version: '1.0.0',
     description: 'some stuff',
   }
-  const testDir = t.testdir({
-    'package.json': JSON.stringify(manifest, null, 2),
-    'index.js': 'hello',
-  })
-
-  const tarData = await pack(`file:${testDir}`, { ...opts })
-  const shasum = crypto.createHash('sha1').update(tarData).digest('hex')
-  const integrity = ssri.fromData(tarData, { algorithms: ['sha512'] })
 
   const basePackument = {
     name: 'libnpmpublish',
@@ -336,14 +304,6 @@ t.test('retry after a conflict -- no versions on remote', async t => {
     version: '1.0.0',
     description: 'some stuff',
   }
-  const testDir = t.testdir({
-    'package.json': JSON.stringify(manifest, null, 2),
-    'index.js': 'hello',
-  })
-
-  const tarData = await pack(`file:${testDir}`, { ...opts })
-  const shasum = crypto.createHash('sha1').update(tarData).digest('hex')
-  const integrity = ssri.fromData(tarData, { algorithms: ['sha512'] })
 
   const basePackument = {
     name: 'libnpmpublish',
@@ -422,14 +382,7 @@ t.test('version conflict', async t => {
     version: '1.0.0',
     description: 'some stuff',
   }
-  const testDir = t.testdir({
-    'package.json': JSON.stringify(manifest, null, 2),
-    'index.js': 'hello',
-  })
 
-  const tarData = await pack(`file:${testDir}`, { ...opts })
-  const shasum = crypto.createHash('sha1').update(tarData).digest('hex')
-  const integrity = ssri.fromData(tarData, { algorithms: ['sha512'] })
   const basePackument = {
     name: 'libnpmpublish',
     description: 'some stuff',
@@ -517,14 +470,7 @@ t.test('publish includes access', async t => {
     version: '1.0.0',
     description: 'some stuff',
   }
-  const testDir = t.testdir({
-    'package.json': JSON.stringify(manifest, null, 2),
-    'index.js': 'hello',
-  })
 
-  const tarData = await pack(`file:${testDir}`, { ...opts })
-  const shasum = crypto.createHash('sha1').update(tarData).digest('hex')
-  const integrity = ssri.fromData(tarData, { algorithms: ['sha512'] })
   const packument = {
     name: 'libnpmpublish',
     description: 'some stuff',
@@ -610,14 +556,7 @@ t.test('other error code', async t => {
     version: '1.0.0',
     description: 'some stuff',
   }
-  const testDir = t.testdir({
-    'package.json': JSON.stringify(manifest, null, 2),
-    'index.js': 'hello',
-  })
 
-  const tarData = await pack(`file:${testDir}`, { ...opts })
-  const shasum = crypto.createHash('sha1').update(tarData).digest('hex')
-  const integrity = ssri.fromData(tarData, { algorithms: ['sha512'] })
   const packument = {
     name: 'libnpmpublish',
     description: 'some stuff',
@@ -684,10 +623,6 @@ t.test('publish existing package with provenance in gha', async t => {
   }
   const spec = npa(manifest.name)
 
-  const testDir = t.testdir({
-    'package.json': JSON.stringify(manifest, null, 2),
-    'index.js': 'hello',
-  })
   // Data for mocking the OIDC token request
   const oidcClaims = {
     iss: 'https://oauth2.sigstore.dev/auth',
@@ -738,9 +673,6 @@ t.test('publish existing package with provenance in gha', async t => {
     },
   }
 
-  const tarData = await pack(`file:${testDir}`, { ...opts })
-  const shasum = crypto.createHash('sha1').update(tarData).digest('hex')
-  const integrity = ssri.fromData(tarData, { algorithms: ['sha512'] })
   const packument = {
     _id: manifest.name,
     name: manifest.name,
@@ -888,11 +820,6 @@ t.test('user-supplied provenance - success', async t => {
     description: 'test libnpmpublish package',
   }
   const spec = npa(manifest.name)
-  const tarData = fs.readFileSync(
-    path.join(__dirname, './fixtures/npmcli-libnpmpublish-test-1.0.0.tgz')
-  )
-  const shasum = crypto.createHash('sha1').update(tarData).digest('hex')
-  const integrity = ssri.fromData(tarData, { algorithms: ['sha512'] })
   const packument = {
     _id: manifest.name,
     name: manifest.name,
@@ -1056,9 +983,6 @@ t.test('user-supplied provenance - provenance bundle w/ bad signature', async t 
     version: '1.0.0',
     description: 'test libnpmpublish package',
   }
-  const tarData = fs.readFileSync(
-    path.join(__dirname, './fixtures/npmcli-libnpmpublish-test-1.0.0.tgz')
-  )
   await t.rejects(
     publish(manifest, tarData, {
       ...opts,
