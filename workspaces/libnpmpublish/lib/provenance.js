@@ -17,9 +17,39 @@ const verifyProvenance = async (subject, provenance, tarballData) => {
     err.message = `Invalid provenance provided: ${err.message}`
     throw err
   }
-  // TODO
-  // await sigstore.verify(provenanceBundle, tarballData)
+
+  const payload = extractBundlePayload(provenanceBundle)
+  if (!payload.subject || !payload.subject.length) {
+    throw new Error('No subject found in sigstore bundle payload')
+  }
+  if (payload.subject.length > 1) {
+    throw new Error('Found more than one subject in the sigstore bundle payload')
+  }
+
+  const bundleSubject = payload.subject[0]
+  if (subject.name !== bundleSubject.name) {
+    throw new Error(
+      `Provenance subject ${bundleSubject.name} does not match the package: ${subject.name}`
+    )
+  }
+  if (subject.digest.sha512 !== bundleSubject.digest.sha512) {
+    throw new Error('Provenance subject digest does not match the package')
+  }
+
+  await sigstore.verify(provenanceBundle)
   return provenanceBundle
+}
+
+const extractBundlePayload = (bundle) => {
+  if (!bundle?.dsseEnvelope?.payload) {
+    throw new Error('No dsseEnvelope with payload found in sigstore bundle')
+  }
+  try {
+    return JSON.parse(Buffer.from(bundle.dsseEnvelope.payload, 'base64').toString('utf8'))
+  } catch (err) {
+    err.message = `Failed to parse payload from dsseEnvelope: ${err.message}`
+    throw err
+  }
 }
 
 const generateProvenance = async (subject, opts) => {

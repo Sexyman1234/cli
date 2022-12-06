@@ -2,6 +2,8 @@
 
 const cloneDeep = require('lodash.clonedeep')
 const crypto = require('crypto')
+const fs = require('fs')
+const path = require('path')
 const npa = require('npm-package-arg')
 const pack = require('libnpmpack')
 const ssri = require('ssri')
@@ -886,11 +888,9 @@ t.test('user-supplied provenance - success', async t => {
     description: 'test libnpmpublish package',
   }
   const spec = npa(manifest.name)
-  const testDir = t.testdir({
-    'package.json': JSON.stringify(manifest, null, 2),
-    'index.js': 'hello',
-  })
-  const tarData = await pack(`file:${testDir}`, { ...opts })
+  const tarData = fs.readFileSync(
+    path.join(__dirname, './fixtures/npmcli-libnpmpublish-test-1.0.0.tgz')
+  )
   const shasum = crypto.createHash('sha1').update(tarData).digest('hex')
   const integrity = ssri.fromData(tarData, { algorithms: ['sha512'] })
   const packument = {
@@ -923,7 +923,7 @@ t.test('user-supplied provenance - success', async t => {
       '@npmcli/libnpmpublish-test-1.0.0.sigstore': {
         content_type: 'application/vnd.dev.sigstore.bundle+json;version=0.1',
         data: /.*/, // Can't match against static value as signature is always different
-        length: 5501,
+        length: 7927,
       },
     },
   }
@@ -932,7 +932,7 @@ t.test('user-supplied provenance - success', async t => {
   }).reply(201, {})
   const ret = await publish(manifest, tarData, {
     ...opts,
-    provenance: './test/fixtures/provenance.json',
+    provenance: './test/fixtures/valid-bundle.json',
   })
   t.ok(ret, 'publish succeeded')
 })
@@ -947,8 +947,123 @@ t.test('user-supplied provenance - failure', async t => {
   await t.rejects(
     publish(manifest, Buffer.from(''), {
       ...opts,
-      provenance: './test/fixtures/bad-provenance.json',
+      provenance: './test/fixtures/bad-bundle.json',
     }),
     { message: /Invalid provenance provided/ }
+  )
+})
+
+t.test('user-supplied provenance - bundle missing DSSE envelope', async t => {
+  const { publish } = t.mock('..')
+  const manifest = {
+    name: '@npmcli/libnpmpublish-test',
+    version: '1.0.0',
+    description: 'test libnpmpublish package',
+  }
+  await t.rejects(
+    publish(manifest, Buffer.from(''), {
+      ...opts,
+      provenance: './test/fixtures/no-provenance-envelope-bundle.json',
+    }),
+    { message: /No dsseEnvelope with payload found/ }
+  )
+})
+
+t.test('user-supplied provenance - bundle with invalid DSSE payload', async t => {
+  const { publish } = t.mock('..')
+  const manifest = {
+    name: '@npmcli/libnpmpublish-test',
+    version: '1.0.0',
+    description: 'test libnpmpublish package',
+  }
+  await t.rejects(
+    publish(manifest, Buffer.from(''), {
+      ...opts,
+      provenance: './test/fixtures/bad-dsse-payload-bundle.json',
+    }),
+    { message: /Failed to parse payload/ }
+  )
+})
+
+t.test('user-supplied provenance - provenance with missing subject', async t => {
+  const { publish } = t.mock('..')
+  const manifest = {
+    name: '@npmcli/libnpmpublish-test',
+    version: '1.0.0',
+    description: 'test libnpmpublish package',
+  }
+  await t.rejects(
+    publish(manifest, Buffer.from(''), {
+      ...opts,
+      provenance: './test/fixtures/no-provenance-subject-bundle.json',
+    }),
+    { message: /No subject found/ }
+  )
+})
+
+t.test('user-supplied provenance - provenance w/ multiple subjects', async t => {
+  const { publish } = t.mock('..')
+  const manifest = {
+    name: '@npmcli/libnpmpublish-test',
+    version: '1.0.0',
+    description: 'test libnpmpublish package',
+  }
+  await t.rejects(
+    publish(manifest, Buffer.from(''), {
+      ...opts,
+      provenance: './test/fixtures/multi-subject-provenance-bundle.json',
+    }),
+    { message: /Found more than one subject/ }
+  )
+})
+
+t.test('user-supplied provenance - provenance w/ mismatched subject name', async t => {
+  const { publish } = t.mock('..')
+  const manifest = {
+    name: '@npmcli/libnpmpublish-fail-test',
+    version: '1.0.0',
+    description: 'test libnpmpublish package',
+  }
+  await t.rejects(
+    publish(manifest, Buffer.from(''), {
+      ...opts,
+      provenance: './test/fixtures/valid-bundle.json',
+    }),
+    { message: /Provenance subject/ }
+  )
+})
+
+t.test('user-supplied provenance - provenance w/ mismatched package digest', async t => {
+  const { publish } = t.mock('..')
+  const manifest = {
+    name: '@npmcli/libnpmpublish-test',
+    version: '1.0.0',
+    description: 'test libnpmpublish package',
+  }
+  await t.rejects(
+    publish(manifest, Buffer.from(''), {
+      ...opts,
+      provenance: './test/fixtures/digest-mismatch-provenance-bundle.json',
+    }),
+    { message: /Provenance subject digest does not match/ }
+  )
+})
+
+t.test('user-supplied provenance - provenance bundle w/ bad signature', async t => {
+  const { publish } = t.mock('..')
+  const manifest = {
+    name: '@npmcli/libnpmpublish-test',
+    version: '1.0.0',
+    description: 'test libnpmpublish package',
+  }
+  const tarData = fs.readFileSync(
+    path.join(__dirname, './fixtures/npmcli-libnpmpublish-test-1.0.0.tgz')
+  )
+  await t.rejects(
+    publish(manifest, tarData, {
+      ...opts,
+      provenance: './test/fixtures/invalid-signature-bundle.json',
+    }),
+    { message: /artifact signature verification failed/ }
   )
 })
