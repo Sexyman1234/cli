@@ -631,9 +631,6 @@ t.test('publish existing package with provenance in gha', async t => {
   const idToken = `.${Buffer.from(JSON.stringify(oidcClaims)).toString('base64')}.`
 
   // Data for mocking Fulcio certifcate request
-  // XXX find the real fulcioBaseURL and rekorBaseURL
-  // https://fulcio.sigstore.dev
-  // https://rekor.sigstore.dev
   const fulcioURL = 'https://mock.fulcio'
   const leafCertificate = `-----BEGIN CERTIFICATE-----\nabc\n-----END CERTIFICATE-----\n`
   const rootCertificate = `-----BEGIN CERTIFICATE-----\nxyz\n-----END CERTIFICATE-----\n`
